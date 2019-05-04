@@ -113,10 +113,11 @@ public class MainActivity extends AppCompatActivity {
             try {
                 jsonResponse = makeHttpRequest(url);
             } catch (IOException e) {
-                // TODO Handle the IOException
+                // Handle the IOException
+                Log.e(LOG_TAG, "Problem making the HTTP request.", e);
             }
 
-            // Extract relevant fields from the JSON response and create an {@link Event} object
+                // Extract relevant fields from the JSON response and create an {@link Event} object
             Event earthquake = extractFeatureFromJson(jsonResponse);
 
             // Return the {@link Event} object as the result fo the {@link TsunamiAsyncTask}
@@ -129,6 +130,7 @@ public class MainActivity extends AppCompatActivity {
          */
         @Override
         protected void onPostExecute(Event earthquake) {
+            // If there is a null earthquake, we won't update the UI
             if (earthquake == null) {
                 return;
             }
@@ -144,6 +146,8 @@ public class MainActivity extends AppCompatActivity {
             try {
                 url = new URL(stringUrl);
             } catch (MalformedURLException exception) {
+                // Print error stack in detailed format
+//                exception.printStackTrace();
                 Log.e(LOG_TAG, "Error with creating URL", exception);
                 return null;
             }
@@ -167,7 +171,9 @@ public class MainActivity extends AppCompatActivity {
                 // Set up HTTP request
                 urlConnection = (HttpURLConnection) url.openConnection();
                 urlConnection.setRequestMethod("GET");
+                // Timeout for reading InputStream
                 urlConnection.setReadTimeout(10000 /* milliseconds */);
+                // Timeout for urlConnection.connect()
                 urlConnection.setConnectTimeout(15000 /* milliseconds */);
                 // Establish the HTTP connection with the server
                 urlConnection.connect();
@@ -176,19 +182,26 @@ public class MainActivity extends AppCompatActivity {
                 // If the request was successful (response code 200) then read the input stream
                 // and parse the response
                 if (urlConnection.getResponseCode() == 200) {
-                    // Get input stream containing the results (receive the response)
+                    // Retrieve the response body as an InputStream and extract the jsonResponse
                     inputStream = urlConnection.getInputStream();
                     jsonResponse = readFromStream(inputStream);
                 }
             } catch (IOException e) {
-                // TODO: Handle the exception
+                // Handle the exception
+                // verify it e.g. by putting the phone into airplane mode; if we want to connect to internet to results,
+                // it will cause an exception
+                Log.e(LOG_TAG, "Problem retrieving the earthquake JSON results.", e);
             } finally {
+                // Close Stream and disconnect HTTPS connection.
                 if (urlConnection != null) {
                     urlConnection.disconnect();
                 }
                 if (inputStream != null) {
                     // function must handle java.io.IOException here
                     inputStream.close();
+                }  else {
+                    // by creating bad request URL
+                    Log.e(LOG_TAG, "Error response code: " + urlConnection.getResponseCode());
                 }
             }
             return jsonResponse;
@@ -199,13 +212,23 @@ public class MainActivity extends AppCompatActivity {
          * whole JSON response from the server.
          */
         private String readFromStream(InputStream inputStream) throws IOException {
+            // Create a new StringBuilder and start appending to it all the lines of text available
+            // in our BufferedReader
             StringBuilder output = new StringBuilder();
             if (inputStream != null) {
+                // Use InputStreamReader to handle translation process from raw data to human readable characters.
+                // It only allows you to read a single character at time (this could cause performance problems).
                 InputStreamReader inputStreamReader = new InputStreamReader(inputStream, Charset.forName("UTF-8"));
+                // This can be avoided by wrapping of InputStreamReader in the BufferedReader.
+                // BufferedReader will accept your request for the character and will instead read and
+                // save larger chunk of data.
                 BufferedReader reader = new BufferedReader(inputStreamReader);
+                // Ask BufferedReader for a line of text
                 String line = reader.readLine();
                 while (line != null) {
+                    // Append the line to string buffer
                     output.append(line);
+                    // and read another line
                     line = reader.readLine();
                 }
             }
@@ -219,6 +242,8 @@ public class MainActivity extends AppCompatActivity {
         private Event extractFeatureFromJson(String earthquakeJSON) {
             // If the JSON string is empty or null, then return early
             if (TextUtils.isEmpty(earthquakeJSON)) {
+                //we return null because there is no valid Event object from the jsonResponse
+                // (return data type from extractFeatureFromJson method is Event)
                 return null;
             }
 
